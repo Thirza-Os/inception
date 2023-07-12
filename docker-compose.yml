@@ -1,0 +1,64 @@
+version: '3.5'
+
+# Network configuration (which networks should the containers be connected to)
+networks:
+  inception-network:                                  # Network is called network
+    driver: bridge                          # Driver property is set to bridge: Creates isolated network on the host, allows containers to communicate with container names as hostnames. 
+
+# Volume configuration (where to store the data of the application)
+volumes:
+  wordpress-volume:
+  mariadb-volume:
+
+# Service configuration (which containers are present)
+services:
+  wordpress:
+    depends_on:
+      - mariadb
+    build:
+      context: ./requirements/wordpress
+      args:
+        SQL_DATABASE: ${SQL_DATABASE}
+        SQL_HOSTNAME: ${SQL_HOSTNAME}
+        SQL_USERNAME: ${SQL_USERNAME}
+        SQL_PASSWORD: ${SQL_PASSWORD}
+    image: wp
+    container_name: wp
+    env_file: .env
+    volumes:
+      - wordpress-volume:/var/www/wordpress  # Mount volume to store the data (to be able to use the data after the container stops running)(is created automatically)
+    networks:
+      - inception-network                    # add container to network
+    restart: no
+
+  nginx:
+    depends_on:
+      - wordpress
+    build:
+      context: ./requirements/nginx
+    container_name: nginx
+    env_file: .env
+    volumes:
+      - wordpress-volume:/var/www/wordpress  # Same as wordpress because nginx is only the server
+    networks:
+      - inception-network
+    ports:
+      - "443:443"
+    restart: always
+
+  mariadb:
+    build:
+      context: ./requirements/mariadb
+      args:
+        SQL_DATABASE: ${SQL_DATABASE}
+        SQL_HOSTNAME: ${SQL_HOSTNAME}
+        SQL_USERNAME: ${SQL_USERNAME}
+        SQL_PASSWORD: ${SQL_PASSWORD}
+    image: mariadb
+    container_name: mariadb
+    env_file: .env
+    volumes:
+      - mariadb-volume:/var/lib/mysql
+    networks:
+      - inception-network
+    restart: always
